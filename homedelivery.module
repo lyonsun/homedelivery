@@ -1,0 +1,372 @@
+<?php
+
+/**
+ * Implements hook_entity_info().
+ */
+function homedelivery_entity_info() {
+  $return['homedelivery'] = array(
+    'label' => t('Homedelivery'),
+    'controller class' => 'HomedeliveryController',
+    'base table' => 'homedelivery',
+    'revision table' => 'homedelivery_revision',
+    'uri callback' => 'homedelivery_uri',
+    'fieldable' => TRUE,
+    'entity keys' => array(
+      'id' => 'aid',
+      'revision' => 'vid',
+      'bundle' => 'type',
+      'label' => 'title',
+     ),
+    'bundle keys' => array(
+      'bundle' => 'type',
+    ),
+    'static cache' => TRUE,
+    'bundles' => array(),
+    'view modes' => array(
+      'full' => array(
+        'label' => t('Full content'),
+        'custom settings' => FALSE,
+      ),
+      'teaser' => array(
+        'label' => t('Teaser'),
+        'custom settings' => FALSE,
+      ),
+    ),
+  );
+
+  foreach (homedelivery_types() as $type => $info) {
+    $return['homedelivery']['bundles'][$type] = array(
+      'label' => $info->name,
+      'admin' => array(
+        'path' => 'admin/structure/homedeliverys/manage/%homedelivery_type',
+        'real path' => 'admin/structure/homedeliverys/manage/' . str_replace('_', '-', $type),
+        'bundle argument' => 4,
+        'access arguments' => array('administer homedeliverys'),
+      ),
+    );
+  }
+
+  return $return;
+}
+
+/**
+ * Entity uri callback.
+ */
+function homedelivery_uri($homedelivery) {
+  return array(
+    'path' => 'homedelivery/' . $homedelivery->aid,
+  );
+}
+
+/**
+ * Implements hook_fied_extra_fields().
+ */
+function homedelivery_field_extra_fields() {
+  $extra = array();
+
+  foreach (homedelivery_types() as $type) {
+    $extra['homedelivery'][$type->type] = array(
+      'form' => array(
+        'title' => array(
+          'label' => t('Record Date'),
+          'description' => t('The record date of the homedelivery'),
+          'weight' => -5,
+        ),
+      ),
+      'display' => array(
+        'title' => array(
+          'label' => t('Record Date'),
+          'description' => t('The record date of the homedelivery'),
+          'weight' => -5,
+        ),
+      ),
+    );
+  }
+
+  return $extra;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function homedelivery_permission() {
+  return array(
+    'administer homedeliverys' =>  array(
+      'title' => t('Administer homedeliverys'),
+    ),
+    'create homedeliverys' =>  array(
+      'title' => t('Create homedeliverys'),
+    ),
+    'update homedeliverys' =>  array(
+      'title' => t('Update homedeliverys'),
+    ),
+    'view homedeliverys' =>  array(
+      'title' => t('View homedeliverys'),
+    ),
+    'delete homedeliverys' =>  array(
+      'title' => t('Delete homedeliverys'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_menu().
+ */
+function homedelivery_menu() {
+  $items['admin/structure/homedeliverys'] = array(
+    'title' => 'Manage homedeliverys',
+    'description' => 'Manage homedeliverys.',
+    'page callback' => 'homedelivery_overview_types',
+    'access arguments' => array('administer homedeliverys'),
+    'file' => 'homedelivery.admin.inc',
+  );
+  $items['admin/structure/homedeliverys/manage/%homedelivery_type'] = array(
+    'title' => 'View homedelivery type',
+    'title callback' => 'homedelivery_type_page_title',
+    'title arguments' => array(4),
+    'page callback' => 'homedelivery_information',
+    'page arguments' => array(4),
+    'access arguments' => array('administer homedeliverys'),
+    'file' => 'homedelivery.admin.inc',
+  );
+  $items['admin/structure/homedeliverys/manage/%homedelivery_type/view'] = array(
+    'title' => 'View',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+  );
+
+  $items['homedelivery/add'] = array(
+    'title' => 'Add new homedelivery',
+    'page callback' => 'homedelivery_add_page',
+    'access arguments' => array('create homedeliverys'),
+    'weight' => 1,
+    'menu_name' => 'management',
+    'file' => 'homedelivery.pages.inc',
+  );
+  foreach (homedelivery_types() as $type) {
+    $type_url_str = str_replace('_', '-', $type->type);
+    $items['homedelivery/add/' . $type_url_str] = array(
+      'title' => $type->name,
+      'title callback' => 'check_plain',
+      'page callback' => 'homedelivery_add',
+      'page arguments' => array(2),
+      'access arguments' => array('create homedeliverys'),
+      'description' => $type->description,
+      'file' => 'homedelivery.pages.inc',
+    );
+  }
+  $items['homedelivery/%homedelivery'] = array(
+    'title callback' => 'homedelivery_page_title',
+    'title arguments' => array(1),
+    'page callback' => 'homedelivery_page_view',
+    'page arguments' => array(1),
+    'access arguments' => array('view homedeliverys'),
+    'type' => MENU_CALLBACK,
+    'file' => 'homedelivery.pages.inc',
+  );
+  $items['homedelivery/%homedelivery/view'] = array(
+    'title' => 'View',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  );
+  $items['homedelivery/%homedelivery/edit'] = array(
+    'title' => 'Edit',
+    'page callback' => 'homedelivery_page_edit',
+    'page arguments' => array(1),
+    'access arguments' => array('update homedeliverys'),
+    'weight' => 0,
+    'type' => MENU_LOCAL_TASK,
+    'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
+    'file' => 'homedelivery.pages.inc',
+  );
+  $items['homedelivery/%homedelivery/delete'] = array(
+    'title' => 'Delete',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('homedelivery_delete_confirm', 1),
+    'access arguments' => array('delete homedeliverys'),
+    'weight' => 1,
+    'type' => MENU_LOCAL_TASK,
+    'context' => MENU_CONTEXT_INLINE,
+    'file' => 'homedelivery.pages.inc',
+  );
+  $items['homedelivery/recent'] = array(
+    'title' => 'Recently added homedeliverys',
+    'page callback' => 'homedelivery_page_list_recent',
+    'access arguments' => array('view homedeliverys'),
+    'file' => 'homedelivery.pages.inc',
+  );
+
+  return $items;
+}
+
+/**
+ * Sets the page title based on the specified homedelivery.
+ *
+ * @param $homedelivery
+ *   The homedelivery object.
+ */
+function homedelivery_page_title($homedelivery) {
+  return $homedelivery->title;
+}
+
+/**
+ * Implements hook_forms().
+ *
+ * All homedelivery forms share the same form handler.
+ */
+function homedelivery_forms() {
+  $forms = array();
+  if ($types = homedelivery_types()) {
+    foreach (array_keys($types) as $type) {
+      $forms[$type . '_homedelivery_form']['callback'] = 'homedelivery_form';
+    }
+  }
+  return $forms;
+}
+
+/**
+ * Get a list of all homedelivery types available.
+ *
+ * Usually this would be more full-featured.
+ *
+ * @return array
+ *   An array of homedelivery type objects. Note that the "type" key matches what
+ *   was defined as the main key in hook_entity_info().
+ */
+function homedelivery_types() {
+  $types = &drupal_static(__FUNCTION__);
+
+  if (empty($types)) {
+    $types['individual'] = (object)array(
+      'type' => 'individual',
+      'name' => t('Individual'),
+      'description' => t('Individual order.')
+    );
+    $types['company'] = (object)array(
+      'type' => 'company',
+      'name' => t('Company'),
+      'description' => t('Company order.')
+    );
+  }
+  return $types;
+}
+
+/**
+ * Menu title callback.
+ *
+ * @param $type
+ *   The homedelivery type.
+ * @return string
+ *   The human-friendly name of the homedelivery type.
+ */
+function homedelivery_type_page_title($type) {
+  return t('Manage @type', array('@type' => $type->name));
+}
+
+/**
+ * Get an individual homedelivery type definition object.
+ *
+ * @param $type
+ *   The key of the homedelivery type we want.
+ * @return object
+ *   The specified homedelivery type.
+ */
+function homedelivery_type_load($type) {
+  $types = homedelivery_types();
+  $type = str_replace('-', '_', $type);
+  return isset($types[$type]) ? $types[$type] : FALSE;
+}
+
+/**
+ * Load homedelivery entities from the database.
+ *
+ * This function should be used whenever you need to load more than one homedelivery
+ * from the database. Artworks are loaded into memory and will not require
+ * database access if loaded again during the same page request.
+ *
+ * @see entity_load()
+ *
+ * @param $aids
+ *   An array of homedelivery IDs.
+ * @param $conditions
+ *   An array of conditions on the {homedelivery} table in the form 'field' => $value.
+ * @param $reset
+ *   Whether to reset the internal entity_load cache.
+ *
+ * @return
+ *   An array of node objects indexed by nid.
+ */
+function homedelivery_load_multiple($aids = array(), $conditions = array(), $reset = FALSE) {
+  return entity_load('homedelivery', $aids, $conditions, $reset);
+}
+
+/**
+ * Load an homedelivery object from the database.
+ *
+ * @param $aid
+ *   The homedelivery ID.
+ * @param $vid
+ *   The revision ID.
+ * @param $reset
+ *   Whether to reset the homedelivery_load_multiple cache.
+ *
+ * @return
+ *   A fully-populated node object.
+ */
+function homedelivery_load($aid = NULL, $vid = NULL, $reset = FALSE) {
+  $aids = (isset($aid) ? array($aid) : array());
+  $conditions = (isset($vid) ? array('vid' => $vid) : array());
+  $homedelivery = homedelivery_load_multiple($aids, $conditions, $reset);
+  return $homedelivery ? reset($homedelivery) : FALSE;
+}
+
+/**
+ * Save an homedelivery.
+ *
+ * @param $homedelivery
+ *   The homedelivery to be saved.
+ * @return
+ *   The saved homedelivery, now with an aid if necessary.
+ */
+function homedelivery_save($homedelivery) {
+  return entity_get_controller('homedelivery')->save($homedelivery);
+}
+
+/**
+ * Returns an initialized homedelivery object.
+ *
+ * @param $type
+ *   The machine-readable type of the homedelivery.
+ *
+ * @return
+ *   An homedelivery object with all default fields initialized.
+ */
+function homedelivery_new($type = '') {
+  return entity_get_controller('homedelivery')->create($type);
+}
+
+
+/**
+ * Deletes an homedelivery by ID.
+ *
+ * @param $aid
+ *   The ID of the product to delete.
+ *
+ * @return
+ *   TRUE on success, FALSE otherwise.
+ */
+function homedelivery_delete($aid) {
+  return homedelivery_delete_multiple(array($aid));
+}
+
+/**
+ * Deletes multiple homedeliverys by ID.
+ *
+ * @param $aids
+ *   An array of homedelivery IDs to delete.
+ *
+ * @return
+ *   TRUE on success, FALSE otherwise.
+ */
+function homedelivery_delete_multiple($aids) {
+  return entity_get_controller('homedelivery')->delete($aids);
+}
